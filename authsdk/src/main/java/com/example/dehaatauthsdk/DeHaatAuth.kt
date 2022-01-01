@@ -2,8 +2,7 @@ package com.example.dehaatauthsdk
 
 import android.content.Context
 import android.content.Intent
-import org.keycloak.TokenVerifier
-import org.keycloak.representations.AccessToken
+import com.auth0.android.jwt.JWT
 
 class DeHaatAuth {
 
@@ -189,32 +188,15 @@ class DeHaatAuth {
             fun build() = DeHaatAuth(this)
         }
 
-        fun isSessionValid(
-            accessTokenString: String?,
-            refreshTokenString: String?,
-            clientId: String
-        ): Boolean {
-            return isAccessTokenValid(accessTokenString, clientId) &&
-                    isRefreshTokenValid(refreshTokenString)
-        }
+        fun isSessionValid(accessToken: String?, refreshToken: String?, clientId: String) =
+            isAccessTokenValid(accessToken, clientId) && isRefreshTokenValid(refreshToken)
 
-        fun isAccessTokenValid(accessTokenString: String?, clientId: String): Boolean {
-            val accessToken: AccessToken? = if (TextUtils.isNullCase(accessTokenString))
-                null
-            else
-                TokenVerifier.create(accessTokenString, AccessToken::class.java).token
+        fun isAccessTokenValid(accessToken: String?, clientId: String) =
+            accessToken != null && JWT(accessToken).claims["azp"]?.asString().equals(clientId)
 
-            return accessToken?.issuedFor.equals(clientId)
-        }
+        fun isRefreshTokenValid(refreshToken: String?) =
+            refreshToken != null && !JWT(refreshToken).isExpired(0)
 
-        fun isRefreshTokenValid(refreshTokenString: String?): Boolean {
-            val refreshToken: AccessToken? = if (TextUtils.isNullCase(refreshTokenString))
-                null
-            else
-                TokenVerifier.create(refreshTokenString, AccessToken::class.java).token
-
-            return refreshToken?.isExpired != true
-        }
     }
 
     fun initialize(context: Context) {
