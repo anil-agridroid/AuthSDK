@@ -3,6 +3,7 @@ package com.example.dehaatauthsdk
 import android.content.Context
 import android.content.Intent
 import com.auth0.android.jwt.JWT
+import com.example.dehaatauthsdk.ClientInfo.getAuthClientInfo
 
 class DeHaatAuth {
 
@@ -199,18 +200,15 @@ class DeHaatAuth {
 
     }
 
-    fun initialize(context: Context):Boolean {
-        if (ClientInfo.getIsDeHaatAuthInitialized()) return false
-
-        ClientInfo.setAuthSDK(this)
-
-        if (operationState == OperationState.RENEW_TOKEN) {
-            RenewTokenHandler(context).startRenewProcess(refreshToken)
-        } else {
-            val intent = Intent(context, LoginActivity::class.java)
-            context.startActivity(intent)
-        }
-
-        return true
-    }
+    fun initialize(context: Context) =
+        if (getAuthClientInfo() == null) {
+            ClientInfo.setAuthSDK(this)
+            getAuthClientInfo()?.let {
+                if (operationState == OperationState.RENEW_TOKEN)
+                    RenewTokenHandler(context, it.clientId, it.isDebugMode).startRenewProcess()
+                else
+                    context.startActivity(Intent(context, LoginActivity::class.java))
+                true
+            } ?: false
+        } else false
 }

@@ -6,7 +6,6 @@ import android.content.SharedPreferences
 import android.content.res.Resources
 import android.net.Uri
 import android.text.TextUtils
-import com.example.dehaatauthsdk.ClientInfo.getAuthSDK
 import net.openid.appauth.connectivity.ConnectionBuilder
 import net.openid.appauth.connectivity.DefaultConnectionBuilder
 import okio.Buffer
@@ -23,7 +22,8 @@ import java.nio.charset.StandardCharsets
  * changes are detected by comparing the hash of the last known configuration to the read
  * configuration. When a configuration change is detected, the app state is reset.
  */
-class Configuration(private val mContext: Context) {
+class Configuration(private val mContext: Context, private val _clientId:String,
+  private val isDebugMode:Boolean) {
     private val mPrefs: SharedPreferences =
         mContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val mResources: Resources = mContext.resources
@@ -86,7 +86,7 @@ class Configuration(private val mContext: Context) {
     @Throws(InvalidConfigurationException::class)
     private fun readConfiguration() {
         val configSource =
-            if (getAuthSDK().getIsDebugMode())
+            if (isDebugMode)
                 mResources.openRawResource(R.raw.auth_config_debug).source().buffer()
             else
                 mResources.openRawResource(R.raw.auth_config).source().buffer()
@@ -104,7 +104,7 @@ class Configuration(private val mContext: Context) {
             )
         }
         mConfigHash = configData.sha256().base64()
-        clientId = getAuthSDK().getClientId()
+        clientId = _clientId
         mScope = getRequiredConfigString("authorization_scope")
         mRedirectUri = getRequiredConfigUri("redirect_uri")
         endSessionRedirectUri = getRequiredConfigUri("end_session_redirect_uri")
@@ -206,10 +206,10 @@ class Configuration(private val mContext: Context) {
         private const val PREFS_NAME = "config"
         private const val KEY_LAST_HASH = "lastHash"
         private var sInstance = WeakReference<Configuration?>(null)
-        fun getInstance(context: Context): Configuration {
+        fun getInstance(context: Context, _clientId:String, isDebugMode:Boolean): Configuration {
             var config = sInstance.get()
             if (config == null) {
-                config = Configuration(context)
+                config = Configuration(context,_clientId,isDebugMode)
                 sInstance = WeakReference(config)
             }
             return config

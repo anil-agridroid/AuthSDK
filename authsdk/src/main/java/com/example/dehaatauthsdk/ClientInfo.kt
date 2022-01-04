@@ -1,20 +1,11 @@
 package com.example.dehaatauthsdk
 
 object ClientInfo {
-    private lateinit var deHaatAuth: DeHaatAuth
-
-    private var isDeHaatAuthInitialized = false
+    private var deHaatAuth: DeHaatAuth? = null
 
     fun setAuthSDK(deHaatAuth: DeHaatAuth?) {
-        if (deHaatAuth == null)
-            isDeHaatAuthInitialized = false
-        else {
-            this.deHaatAuth = deHaatAuth
-            isDeHaatAuthInitialized = true
-        }
+        this.deHaatAuth = deHaatAuth
     }
 
-    fun getAuthSDK() = deHaatAuth
-
-    fun getIsDeHaatAuthInitialized() = isDeHaatAuthInitialized
+    fun getAuthClientInfo() = deHaatAuth
 }
