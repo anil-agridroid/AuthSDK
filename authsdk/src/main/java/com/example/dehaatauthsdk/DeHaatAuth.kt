@@ -199,7 +199,9 @@ class DeHaatAuth {
 
     }
 
-    fun initialize(context: Context) {
+    fun initialize(context: Context):Boolean {
+        if (ClientInfo.getIsDeHaatAuthInitialized()) return false
+
         ClientInfo.setAuthSDK(this)
 
         if (operationState == OperationState.RENEW_TOKEN) {
@@ -208,5 +210,7 @@ class DeHaatAuth {
             val intent = Intent(context, LoginActivity::class.java)
             context.startActivity(intent)
         }
+
+        return true
     }
 }

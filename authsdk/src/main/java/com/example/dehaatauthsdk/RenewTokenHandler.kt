@@ -42,7 +42,7 @@ class RenewTokenHandler constructor(private val context: Context) {
         initialConfiguration.discoveryUri?.let {
             fetchEndpointsFromDiscoveryUrl(it)
         }?: kotlin.run {
-            handleErrorAndFinishActivity(KotlinNullPointerException("Discovery Url is null"))
+            handleAuthFailureState(KotlinNullPointerException("Discovery Url is null"))
         }
     }
 
@@ -69,7 +69,8 @@ class RenewTokenHandler constructor(private val context: Context) {
         )
     }
 
-    private fun handleErrorAndFinishActivity(exception: Exception?) {
+    private fun handleAuthFailureState(exception: Exception?) {
+        ClientInfo.setAuthSDK(null)
         when (ClientInfo.getAuthSDK().getOperationState()) {
             DeHaatAuth.OperationState.EMAIL_LOGIN, DeHaatAuth.OperationState.MOBILE_LOGIN, DeHaatAuth.OperationState.RENEW_TOKEN -> {
                 ClientInfo.getAuthSDK().getLoginCallback()
@@ -83,7 +84,7 @@ class RenewTokenHandler constructor(private val context: Context) {
     private var handleConfigurationRetrievalResult =
         AuthorizationServiceConfiguration.RetrieveConfigurationCallback { config, exception ->
             if (config == null) {
-                handleErrorAndFinishActivity(exception)
+                handleAuthFailureState(exception)
             } else {
                 _mAuthServiceConfiguration = config
                 createAuthRequest()
@@ -101,7 +102,7 @@ class RenewTokenHandler constructor(private val context: Context) {
                 ).setScope(initialConfiguration.scope).setLoginHint("Please enter email").build()
             startRenewAuthToken(ClientInfo.getAuthSDK().getRefreshToken())
         } ?: kotlin.run {
-            handleErrorAndFinishActivity(KotlinNullPointerException("Client id is null"))
+            handleAuthFailureState(KotlinNullPointerException("Client id is null"))
         }
     }
 
@@ -118,7 +119,7 @@ class RenewTokenHandler constructor(private val context: Context) {
 
             performTokenRequest(tokenRequest, handleTokenResponseCallback)
         } ?: kotlin.run {
-            handleErrorAndFinishActivity(KotlinNullPointerException("Client id is null"))
+            handleAuthFailureState(KotlinNullPointerException("Client id is null"))
         }
     }
 
@@ -149,17 +150,17 @@ class RenewTokenHandler constructor(private val context: Context) {
                         )
                         handleTokenSuccess(tokenInfo)
                     } else {
-                        handleErrorAndFinishActivity(KotlinNullPointerException("access token is null"))
+                        handleAuthFailureState(KotlinNullPointerException("access token is null"))
                     }
                 }
             } ?: kotlin.run {
-                handleErrorAndFinishActivity(exception)
+                handleAuthFailureState(exception)
             }
         }
 
     private fun handleTokenSuccess(tokenInfo: TokenInfo) {
+        ClientInfo.setAuthSDK(null)
         ClientInfo.getAuthSDK().getLoginCallback().onSuccess(tokenInfo)
-
     }
 
 }

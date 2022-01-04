@@ -8,6 +8,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import android.view.View
 import android.webkit.WebSettings
 import android.webkit.WebView
@@ -44,6 +45,7 @@ class LoginActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Log.d("ACTIVITY STATE","onCreate was called")
         initialize()
     }
 
@@ -116,15 +118,15 @@ class LoginActivity : Activity() {
 
     private var handleConfigurationRetrievalResult =
         AuthorizationServiceConfiguration.RetrieveConfigurationCallback { config, exception ->
-            if (config == null) {
+            if (config == null || isFinishing) {
                 handleErrorAndFinishActivity(exception)
             } else {
                 _mAuthServiceConfiguration = config
-                createAuthRequest()
+                chooseOperationAndProcess()
             }
         }
 
-    private fun createAuthRequest() {
+    private fun createAuthRequest(state:DeHaatAuth.OperationState) {
         initialConfiguration.clientId?.let { clientId ->
             _mAuthRequest =
                 AuthorizationRequest.Builder(
@@ -133,7 +135,13 @@ class LoginActivity : Activity() {
                     ResponseTypeValues.CODE,
                     Uri.parse(getRedirectUri())
                 ).setScope(initialConfiguration.scope).build()
-            chooseOperationAndProcess()
+
+            if (state == EMAIL_LOGIN)
+                startEmailLogin()
+
+            if (state == MOBILE_LOGIN)
+                loadAuthorizationEndpointInWebView(mAuthRequest.toUri().toString())
+
         } ?: kotlin.run {
             handleErrorAndFinishActivity(Exception(Constants.CLIENT_ID_NULL))
         }
@@ -148,18 +156,13 @@ class LoginActivity : Activity() {
         }
 
     private fun chooseOperationAndProcess() =
-        when (ClientInfo.getAuthSDK().getOperationState()) {
-            EMAIL_LOGIN ->
-                startEmailLogin()
-
-            MOBILE_LOGIN ->
-                loadAuthorizationEndpointInWebView(mAuthRequest.toUri().toString())
-
-            RENEW_TOKEN ->
-                startRenewAuthToken(ClientInfo.getAuthSDK().getRefreshToken())
+        when (val state = ClientInfo.getAuthSDK().getOperationState()) {
+            EMAIL_LOGIN, MOBILE_LOGIN -> createAuthRequest(state)
 
             LOGOUT ->
                 startLogout(ClientInfo.getAuthSDK().getIdToken())
+
+            else -> handleErrorAndFinishActivity(java.lang.Exception(""))
         }
 
 
@@ -204,6 +207,11 @@ class LoginActivity : Activity() {
                                 Exception(Constants.AUTHORIZATION_FAIL)
                             )
                         }
+
+                        checkIfUrlIsLogoutUrl(it) -> {
+                            webView.loadUrl(it)
+                        }
+
                         else -> {
                             handleErrorAndFinishActivity(
                                 Exception(Constants.UNKNOWN_URL + url)
@@ -224,10 +232,13 @@ class LoginActivity : Activity() {
         url.contains(getRedirectUri())
 
     private fun checkIfUrlIsAuthorizationUrl(url: String) =
-        url.contains(mAuthRequest.toUri().toString())
+        _mAuthRequest != null && url.contains(mAuthRequest.toUri().toString())
 
     private fun checkIfUrlIsAuthorizationFailUrl(url: String) =
         url.contains(Constants.AUTHORIZATION_FAIL_URL)
+
+    private fun checkIfUrlIsLogoutUrl(url: String) =
+        _mLogoutRequest != null && url.contains(mLogoutRequest.toUri().toString())
 
     private fun inputUserCredentialsAndClickSignIn(userName: String, password: String) =
         loadUrl(
@@ -321,21 +332,25 @@ class LoginActivity : Activity() {
 
     private var handleTokenResponseCallback =
         TokenResponseCallback { response, exception ->
-            response?.let {
-                with(it) {
-                    if (accessToken != null && refreshToken != null && idToken != null) {
-                        val tokenInfo = TokenInfo(
-                            it.accessToken!!,
-                            it.refreshToken!!,
-                            it.idToken!!
-                        )
-                        handleTokenSuccess(tokenInfo)
-                    } else {
-                        handleErrorAndFinishActivity(Exception(Constants.TOKEN_RESPONSE_NULL))
+            if(isFinishing)
+                handleErrorAndFinishActivity(java.lang.Exception(""))
+            else {
+                response?.let {
+                    with(it) {
+                        if (accessToken != null && refreshToken != null && idToken != null) {
+                            val tokenInfo = TokenInfo(
+                                it.accessToken!!,
+                                it.refreshToken!!,
+                                it.idToken!!
+                            )
+                            handleTokenSuccess(tokenInfo)
+                        } else {
+                            handleErrorAndFinishActivity(Exception(Constants.TOKEN_RESPONSE_NULL))
+                        }
                     }
+                } ?: kotlin.run {
+                    handleErrorAndFinishActivity(exception)
                 }
-            } ?: kotlin.run {
-                handleErrorAndFinishActivity(exception)
             }
         }
 
@@ -360,6 +375,7 @@ class LoginActivity : Activity() {
         _mLogoutRequest = null
         _mAuthRequest = null
         _mAuthServiceConfiguration = null
+        ClientInfo.setAuthSDK(null)
         super.onDestroy()
     }
 
@@ -416,6 +432,11 @@ class LoginActivity : Activity() {
 
     companion object {
         private const val EMAIL_LOGIN_REQUEST_CODE = 100
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        Log.d("ACTIVITY STATE","onNewIntent was called")
     }
 
 }
