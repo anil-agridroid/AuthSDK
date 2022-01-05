@@ -3,13 +3,10 @@ package com.example.dehaatauthsdk
 import android.content.Context
 import android.net.Uri
 import com.example.dehaatauthsdk.ClientInfo.getAuthClientInfo
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
 import net.openid.appauth.*
 
-class RenewTokenHandler constructor(private val context: Context, _clientId:String, isDebugMode:Boolean) {
+class RenewTokenHandler constructor(private val context: Context,
+                                    _clientId: String, isDebugMode: Boolean) {
 
     private lateinit var mAuthService: AuthorizationService
 
@@ -19,26 +16,14 @@ class RenewTokenHandler constructor(private val context: Context, _clientId:Stri
     private var _mAuthServiceConfiguration: AuthorizationServiceConfiguration? = null
     private val mAuthServiceConfiguration get() = _mAuthServiceConfiguration!!
 
-    private lateinit var job: Job
-
     init {
-        _initialConfiguration = Configuration.getInstance(context,_clientId,isDebugMode)
+        _initialConfiguration = Configuration.getInstance(context, _clientId, isDebugMode)
     }
 
-    fun startRenewProcess(){
-        job = CoroutineScope((Dispatchers.IO)).launch {
-            startAuthorizationServiceCreation()
-        }
-    }
-
-
-    private fun startAuthorizationServiceCreation() {
-        disposeCurrentServiceIfExist()
-        mAuthService = createNewAuthorizationService()
+    fun startRenewProcess() =
         initialConfiguration.discoveryUri?.let {
             fetchEndpointsFromDiscoveryUrl(it)
         } ?: handleAuthFailureState(KotlinNullPointerException("Discovery Url is null"))
-    }
 
     private fun disposeCurrentServiceIfExist() {
         if (::mAuthService.isInitialized) {
@@ -74,7 +59,6 @@ class RenewTokenHandler constructor(private val context: Context, _clientId:Stri
                     it.getLogoutCallback().onLogoutFailure(exception)
             }
             ClientInfo.setAuthSDK(null)
-            job.cancel(null)
         }
 
     private var handleConfigurationRetrievalResult =
@@ -105,6 +89,8 @@ class RenewTokenHandler constructor(private val context: Context, _clientId:Stri
         request: TokenRequest,
         callback: AuthorizationService.TokenResponseCallback
     ) {
+        disposeCurrentServiceIfExist()
+        mAuthService = createNewAuthorizationService()
         val clientAuthentication =
             ClientSecretBasic(initialConfiguration.tokenEndpointUri.toString())
 
@@ -139,7 +125,5 @@ class RenewTokenHandler constructor(private val context: Context, _clientId:Stri
         getAuthClientInfo()?.let {
             it.getLoginCallback().onSuccess(tokenInfo)
             ClientInfo.setAuthSDK(null)
-            job.cancel(null)
         }
-
 }
