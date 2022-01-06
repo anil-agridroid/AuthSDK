@@ -122,6 +122,7 @@ class LoginActivity : Activity() {
         }
 
     private fun triggerAuthUrlInCustomTab(){
+        mAuthService = createNewAuthorizationService()
         val authIntent = createNewAuthorizationService()
             .createCustomTabsIntentBuilder(mAuthRequest.toUri()).build()
         val authRequestIntent = mAuthService.getAuthorizationRequestIntent(mAuthRequest, authIntent)
