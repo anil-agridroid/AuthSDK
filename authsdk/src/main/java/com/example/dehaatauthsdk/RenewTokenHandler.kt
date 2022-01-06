@@ -5,8 +5,10 @@ import android.net.Uri
 import com.example.dehaatauthsdk.ClientInfo.getAuthClientInfo
 import net.openid.appauth.*
 
-class RenewTokenHandler constructor(private val context: Context,
-                                    _clientId: String, isDebugMode: Boolean) {
+class RenewTokenHandler constructor(
+    private val context: Context,
+    _clientId: String, isDebugMode: Boolean
+) {
 
     private lateinit var mAuthService: AuthorizationService
 
@@ -23,7 +25,7 @@ class RenewTokenHandler constructor(private val context: Context,
     fun startRenewProcess() =
         initialConfiguration.discoveryUri?.let {
             fetchEndpointsFromDiscoveryUrl(it)
-        } ?: handleAuthFailureState(KotlinNullPointerException("Discovery Url is null"))
+        } ?: handleRenewTokenFailure(KotlinNullPointerException("Discovery Url is null"))
 
     private fun disposeCurrentServiceIfExist() {
         if (::mAuthService.isInitialized) {
@@ -31,7 +33,7 @@ class RenewTokenHandler constructor(private val context: Context,
         }
     }
 
-    private fun createNewAuthorizationService() =
+    private fun getNewAuthorizationService() =
         AuthorizationService(
             context,
             AppAuthConfiguration.Builder()
@@ -48,23 +50,10 @@ class RenewTokenHandler constructor(private val context: Context,
         )
     }
 
-    private fun handleAuthFailureState(exception: Exception?) =
-        getAuthClientInfo()?.let {
-            when (it.getOperationState()) {
-                DeHaatAuth.OperationState.EMAIL_LOGIN, DeHaatAuth.OperationState.MOBILE_LOGIN, DeHaatAuth.OperationState.RENEW_TOKEN -> {
-                    it.getLoginCallback()
-                        .onFailure(exception)
-                }
-                DeHaatAuth.OperationState.LOGOUT ->
-                    it.getLogoutCallback().onLogoutFailure(exception)
-            }
-            ClientInfo.setAuthSDK(null)
-        }
-
     private var handleConfigurationRetrievalResult =
         AuthorizationServiceConfiguration.RetrieveConfigurationCallback { config, exception ->
             if (config == null) {
-                handleAuthFailureState(exception)
+                handleRenewTokenFailure(exception)
             } else {
                 _mAuthServiceConfiguration = config
                 startRenewAuthToken()
@@ -82,7 +71,7 @@ class RenewTokenHandler constructor(private val context: Context,
                     .build()
 
                 performTokenRequest(tokenRequest, handleTokenResponseCallback)
-            } ?: handleAuthFailureState(KotlinNullPointerException("Client id is null"))
+            } ?: handleRenewTokenFailure(KotlinNullPointerException("Client id is null"))
         }
 
     private fun performTokenRequest(
@@ -90,7 +79,7 @@ class RenewTokenHandler constructor(private val context: Context,
         callback: AuthorizationService.TokenResponseCallback
     ) {
         disposeCurrentServiceIfExist()
-        mAuthService = createNewAuthorizationService()
+        mAuthService = getNewAuthorizationService()
         val clientAuthentication =
             ClientSecretBasic(initialConfiguration.tokenEndpointUri.toString())
 
@@ -113,17 +102,24 @@ class RenewTokenHandler constructor(private val context: Context,
                         )
                         handleTokenSuccess(tokenInfo)
                     } else {
-                        handleAuthFailureState(KotlinNullPointerException("access token is null"))
+                        handleRenewTokenFailure(KotlinNullPointerException("access token is null"))
                     }
                 }
-            } ?: kotlin.run {
-                handleAuthFailureState(exception)
-            }
+            } ?: handleRenewTokenFailure(exception)
+
         }
 
     private fun handleTokenSuccess(tokenInfo: TokenInfo) =
         getAuthClientInfo()?.let {
-            it.getLoginCallback().onSuccess(tokenInfo)
-            ClientInfo.setAuthSDK(null)
+            val loginCallback = it.getLoginCallback()
+            ClientInfo.setAuthClientInfo(null)
+            loginCallback.onSuccess(tokenInfo)
+        }
+
+    private fun handleRenewTokenFailure(exception: Exception?) =
+        getAuthClientInfo()?.let {
+            val loginCallback = it.getLoginCallback()
+            ClientInfo.setAuthClientInfo(null)
+            loginCallback.onFailure(exception)
         }
 }

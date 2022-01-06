@@ -123,8 +123,7 @@ class LoginActivity : Activity() {
 
     private fun triggerAuthUrlInCustomTab(){
         mAuthService = createNewAuthorizationService()
-        val authIntent = createNewAuthorizationService()
-            .createCustomTabsIntentBuilder(mAuthRequest.toUri()).build()
+        val authIntent = mAuthService.createCustomTabsIntentBuilder(mAuthRequest.toUri()).build()
         val authRequestIntent = mAuthService.getAuthorizationRequestIntent(mAuthRequest, authIntent)
         startActivityForResult(authRequestIntent, EMAIL_LOGIN_REQUEST_CODE)
     }
@@ -418,7 +417,7 @@ class LoginActivity : Activity() {
         _mLogoutRequest = null
         _mAuthRequest = null
         _mAuthServiceConfiguration = null
-        ClientInfo.setAuthSDK(null)
+        ClientInfo.setAuthClientInfo(null)
         super.onDestroy()
     }
 

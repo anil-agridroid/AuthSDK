@@ -202,7 +202,7 @@ class DeHaatAuth {
 
     fun initialize(context: Context) =
         if (getAuthClientInfo() == null) {
-            ClientInfo.setAuthSDK(this)
+            ClientInfo.setAuthClientInfo(this)
             getAuthClientInfo()?.let {
                 if (operationState == OperationState.RENEW_TOKEN)
                     RenewTokenHandler(context, it.clientId, it.isDebugMode).startRenewProcess()
