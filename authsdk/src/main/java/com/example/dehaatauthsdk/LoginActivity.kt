@@ -355,8 +355,8 @@ class LoginActivity : Activity() {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (resultCode == RESULT_OK && requestCode == EMAIL_LOGIN_REQUEST_CODE && data != null) {
-
+        if (resultCode == RESULT_OK && requestCode == EMAIL_LOGIN_REQUEST_CODE) {
+            handleEmailLoginUrlResponseIntent(data)
         } else {
             handleErrorAndFinishActivity()
         }
@@ -369,7 +369,7 @@ class LoginActivity : Activity() {
                     response.createTokenExchangeRequest(),
                     handleTokenResponseCallback
                 )
-            }
+            }?:handleErrorAndFinishActivity(Exception(Constants.EMAIL_LOGIN_RESPONSE_NULL))
         } ?: handleErrorAndFinishActivity(Exception(Constants.EMAIL_LOGIN_RESPONSE_NULL))
 
     private fun loadUrlInWebview(url: String) {
