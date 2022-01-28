@@ -84,8 +84,6 @@ class LoginActivity : Activity() {
             javaScriptEnabled = true
             layoutAlgorithm = WebSettings.LayoutAlgorithm.TEXT_AUTOSIZING
             loadWithOverviewMode = true
-            pluginState = WebSettings.PluginState.ON
-            setAppCacheEnabled(true)
         }
     }
 
