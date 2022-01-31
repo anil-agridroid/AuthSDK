@@ -105,6 +105,11 @@ class LoginActivity : Activity() {
             applicationContext,
             AppAuthConfiguration.Builder()
                 .setConnectionBuilder(initialConfiguration.connectionBuilder)
+                .apply {
+                    getAuthClientInfo()?.let {
+                        if (it.getIsDebugMode()) setSkipIssuerHttpsCheck(true)
+                    }
+                }
                 .build()
         )
     }

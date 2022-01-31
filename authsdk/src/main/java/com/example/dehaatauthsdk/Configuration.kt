@@ -123,7 +123,9 @@ class Configuration(private val mContext: Context, private val _clientId:String,
         } else {
             discoveryUri = getRequiredConfigWebUri("discovery_uri")
         }
-        isHttpsRequired = mConfigJson!!.optBoolean("https_required", true)
+
+        isHttpsRequired =
+            if (isDebugMode) false else mConfigJson!!.optBoolean("https_required", true)
     }
 
     private fun getConfigString(propName: String?): String? {
