@@ -7,6 +7,7 @@ object Constants {
     const val UNKNOWN_URL = "Unknown Url: "
     const val URL_NULL = "Url is null"
     const val AUTHORIZATION_FAIL_URL = "/login-actions/authenticate"
+    const val RESET_CREDENTIALS = "/login-actions/reset-credentials"
     const val REDIRECT_URL_FAIL = "Redirect url failure"
     const val STATE = "state"
     const val LOGOUT_RESPONSE_NULL = "Logout response is null"

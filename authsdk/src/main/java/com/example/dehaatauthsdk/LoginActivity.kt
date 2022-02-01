@@ -19,7 +19,7 @@ import net.openid.appauth.*
 import net.openid.appauth.AuthorizationException.AuthorizationRequestErrors
 import net.openid.appauth.AuthorizationService.TokenResponseCallback
 
-class LoginActivity : Activity() {
+open class LoginActivity : Activity() {
 
     private lateinit var mAuthService: AuthorizationService
 
@@ -38,11 +38,9 @@ class LoginActivity : Activity() {
 
     private var isPageLoaded = false
     private lateinit var timeoutHandler: Handler
-    private val TIMEOUT = 30L
-    
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Log.d("ACTIVITY STATE","onCreate was called")
         initialize()
     }
 
@@ -54,8 +52,8 @@ class LoginActivity : Activity() {
                 applicationContext,
                 it.getClientId(), it.getIsDebugMode()
             )
-            initialConfiguration.discoveryUri?.let {
-                fetchEndpointsFromDiscoveryUrl(it)
+            initialConfiguration.discoveryUri?.let { uri ->
+                fetchEndpointsFromDiscoveryUrl(uri)
             } ?: handleErrorAndFinishActivity(Exception(Constants.DISCOVERY_URL_NULL))
         } ?: finish()
 
@@ -64,7 +62,7 @@ class LoginActivity : Activity() {
     }
 
 
-    private fun getWebViewWithInitialSetup()  =
+    open fun getWebViewWithInitialSetup()  =
         WebView(this).apply {
             webViewClient = MyWebViewClient()
             enableWebViewSettings()
@@ -73,7 +71,7 @@ class LoginActivity : Activity() {
         }
 
     @SuppressLint("SetJavaScriptEnabled")
-    private fun WebView.enableWebViewSettings() {
+    protected fun WebView.enableWebViewSettings() {
         settings.apply {
             loadsImagesAutomatically = true
             useWideViewPort = true
@@ -85,10 +83,6 @@ class LoginActivity : Activity() {
             layoutAlgorithm = WebSettings.LayoutAlgorithm.TEXT_AUTOSIZING
             loadWithOverviewMode = true
         }
-    }
-
-    private  fun startAuthorizationServiceCreation() {
-
     }
 
     private  fun fetchEndpointsFromDiscoveryUrl(discoveryUrl: Uri) {
@@ -124,20 +118,13 @@ class LoginActivity : Activity() {
             }
         }
 
-    private fun triggerAuthUrlInCustomTab(){
+    private fun triggerAuthUrlInWebView() {
         mAuthService = createNewAuthorizationService()
-        val authIntent = mAuthService.createCustomTabsIntentBuilder(mAuthRequest.toUri()).build()
-        val authRequestIntent = mAuthService.getAuthorizationRequestIntent(mAuthRequest, authIntent)
-        startActivityForResult(authRequestIntent, EMAIL_LOGIN_REQUEST_CODE)
+        loadUrlInWebView(mAuthRequest.toUri().toString())
     }
 
-    private fun triggerAuthUrlInWebview() {
-        mAuthService = createNewAuthorizationService()
-        loadUrlInWebview(mAuthRequest.toUri().toString())
-    }
-
-    private fun triggerLogoutUrlInWebview() =
-        loadUrlInWebview(mLogoutRequest.toUri().toString())
+    private fun triggerLogoutUrlInWebView() =
+        loadUrlInWebView(mLogoutRequest.toUri().toString())
 
     private fun createAuthRequest() {
         initialConfiguration.clientId?.let { clientId ->
@@ -166,64 +153,64 @@ class LoginActivity : Activity() {
     private fun chooseOperationAndProcess() =
         getAuthClientInfo()?.let {
             when (it.getOperationState()) {
-                EMAIL_LOGIN  -> {
+                EMAIL_LOGIN,MOBILE_LOGIN -> {
                     createAuthRequest()
-                    triggerAuthUrlInCustomTab()
-                }
-                MOBILE_LOGIN -> {
-                    createAuthRequest()
-                    triggerAuthUrlInWebview()
+                    triggerAuthUrlInWebView()
                 }
                 LOGOUT -> {
                     createLogoutRequest(it.getIdToken())
-                    triggerLogoutUrlInWebview()
+                    triggerLogoutUrlInWebView()
                 }
                 else -> handleErrorAndFinishActivity(java.lang.Exception(""))
             }
         } ?: finish()
 
-    private fun startEmailLogin() {
-        val authIntent =
-            mAuthService.createCustomTabsIntentBuilder(mAuthRequest.toUri()).build()
-        val intent = mAuthService.getAuthorizationRequestIntent(mAuthRequest, authIntent)
-        startActivityForResult(intent, EMAIL_LOGIN_REQUEST_CODE)
-    }
-
-    private fun disposeCurrentServiceIfExist() =
-        if (!::mAuthService.isInitialized) {
-        } else {
+    private fun disposeCurrentServiceIfExist() {
+        if (::mAuthService.isInitialized) {
             mAuthService.dispose()
         }
+    }
 
     inner class MyWebViewClient : WebViewClient() {
         override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
             super.onPageStarted(view, url, favicon)
             isPageLoaded = false
+            onPageStartedInWebView()
         }
 
         override fun onPageFinished(view: WebView?, url: String?) {
             isPageLoaded = true
-            url?.let {
-                if (checkIfUrlIsRedirectUrl(it))
-                    handleRedirection(it)
-                 else {
-                    when {
-                        checkIfUrlIsAuthorizationUrl(it) -> injectCredentials()
-
-                        checkIfUrlIsLogoutUrl(it) -> loadUrlInWebview(it)
-
-                        else -> handleWrongUrl(it)
-                    }
-                }
-            } ?: handleErrorAndFinishActivity(Exception(Constants.URL_NULL))
+            onPageFinishedInWebView(url)
             super.onPageFinished(view, url)
         }
+    }
+
+    open fun onPageStartedInWebView(){}
+
+    open fun onPageFinishedInWebView(url:String?){
+        url?.let {
+            if (checkIfUrlIsRedirectUrl(it))
+                handleRedirection(it)
+            else {
+                when {
+                    checkIfUrlIsAuthorizationUrl(it) -> injectCredentials()
+
+                    checkIfUrlIsLogoutUrl(it) -> loadUrlInWebView(it)
+
+                    else -> handleWrongUrl(it)
+                }
+            }
+        } ?: handleErrorAndFinishActivity(Exception(Constants.URL_NULL))
     }
 
 
     private fun handleWrongUrl(url:String){
         when {
-            checkIfUrlIsAuthorizationFailUrl(url) -> handleAuthUrlFailure()
+            checkIfUrlIsForgotPassword(url) || checkIfUrlIsAuthorizationFailUrl(url) -> {
+                getAuthClientInfo()?.let {
+                    if(it.getOperationState() != EMAIL_LOGIN) handleAuthUrlFailure()
+                }?:handleErrorAndFinishActivity(Exception(Constants.UNKNOWN_URL + url))
+            }
             else->
                 handleErrorAndFinishActivity(Exception(Constants.UNKNOWN_URL + url))
         }
@@ -241,14 +228,17 @@ class LoginActivity : Activity() {
         handleErrorAndFinishActivity(Exception(Constants.AUTHORIZATION_FAIL))
 
     private fun handleRedirection(url: String) =
-        if (_mLogoutRequest != null) {
-            handleLogoutRedirectUrl(url)
-        } else if (_mAuthRequest != null) {
-            handleLoginRedirectUrl(url)
-        } else
-            handleErrorAndFinishActivity(java.lang.Exception(""))
+        when {
+            _mLogoutRequest != null -> {
+                handleLogoutRedirectUrl(url)
+            }
+            _mAuthRequest != null -> {
+                handleLoginRedirectUrl(url)
+            }
+            else -> handleErrorAndFinishActivity(java.lang.Exception(""))
+        }
 
-    private fun checkIfUrlIsRedirectUrl(url: String) =
+    protected fun checkIfUrlIsRedirectUrl(url: String) =
         url.contains(getRedirectUri())
 
     private fun checkIfUrlIsAuthorizationUrl(url: String) =
@@ -257,11 +247,14 @@ class LoginActivity : Activity() {
     private fun checkIfUrlIsAuthorizationFailUrl(url: String) =
         url.contains(Constants.AUTHORIZATION_FAIL_URL)
 
+    private fun checkIfUrlIsForgotPassword(url: String) =
+        url.contains(Constants.RESET_CREDENTIALS)
+
     private fun checkIfUrlIsLogoutUrl(url: String) =
         _mLogoutRequest != null && url.contains(mLogoutRequest.toUri().toString())
 
     private fun inputUserCredentialsAndClickSignIn(userName: String, password: String) =
-        loadUrlInWebview(
+        loadUrlInWebView(
             "javascript: {" +
                     "document.getElementById('mobile').value = '" + userName + "';" +
                     "document.getElementById('code').value = '" + password + "';" +
@@ -352,31 +345,12 @@ class LoginActivity : Activity() {
                 .setPostLogoutRedirectUri(Uri.parse(getRedirectUri()))
                 .build()
     }
-
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (resultCode == RESULT_OK && requestCode == EMAIL_LOGIN_REQUEST_CODE && data != null)
-            handleEmailLoginUrlResponseIntent(data)
-        else
-            handleErrorAndFinishActivity()
-    }
-
-    private fun handleEmailLoginUrlResponseIntent(intent: Intent?) =
-        intent?.let {
-            AuthorizationResponse.fromIntent(it)?.let { response ->
-                performTokenRequest(
-                    response.createTokenExchangeRequest(),
-                    handleTokenResponseCallback
-                )
-            } ?: handleErrorAndFinishActivity(Exception(Constants.EMAIL_LOGIN_RESPONSE_NULL))
-        } ?: handleErrorAndFinishActivity(Exception(Constants.EMAIL_LOGIN_RESPONSE_NULL))
-
-    private fun loadUrlInWebview(url: String) {
+    private fun loadUrlInWebView(url: String) {
         webView.loadUrl(url)
-        timeoutHandler.postDelayed(getTimeoutRunnable(), TIMEOUT * 1000)
+        timeoutHandler.postDelayed(getTimeoutRunnable(), 30L * 1000)
     }
 
-    //if url load is not finished in webview in 30 seconds then destroy webview and finish the process
+    //if url load is not finished in web view in 30 seconds then destroy web view and finish the process
     private fun getTimeoutRunnable() =
         Runnable {
             if (!isPageLoaded) {
@@ -386,12 +360,12 @@ class LoginActivity : Activity() {
         }
 
     private fun handleTokenSuccess(tokenInfo: TokenInfo) {
-        getAuthClientInfo()?.let { it.getLoginCallback().onSuccess(tokenInfo) }
+        getAuthClientInfo()?.getLoginCallback()?.onSuccess(tokenInfo)
         finish()
     }
 
     private fun handleLogoutSuccess() {
-        getAuthClientInfo()?.let { it.getLogoutCallback().onLogoutSuccess() }
+        getAuthClientInfo()?.getLogoutCallback()?.onLogoutSuccess()
         finish()
     }
 
@@ -410,7 +384,8 @@ class LoginActivity : Activity() {
     }
 
     override fun onDestroy() {
-         disposeCurrentServiceIfExist()
+        disposeCurrentServiceIfExist()
+        _webView?.destroy()
         _webView = null
         _initialConfiguration = null
         _mLogoutRequest = null
@@ -418,10 +393,6 @@ class LoginActivity : Activity() {
         _mAuthServiceConfiguration = null
         ClientInfo.setAuthClientInfo(null)
         super.onDestroy()
-    }
-
-    companion object {
-        private const val EMAIL_LOGIN_REQUEST_CODE = 100
     }
 
     override fun onNewIntent(intent: Intent?) {
