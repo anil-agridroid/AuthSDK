@@ -209,8 +209,7 @@ class DeHaatAuth {
             isAccessTokenValid(accessToken, clientId) && isRefreshTokenValid(refreshToken)
 
         fun isAccessTokenValid(accessToken: String?, clientId: String) =
-            accessToken != null && Date(Calendar.getInstance().timeInMillis).before(JWT(accessToken).expiresAt) &&
-                    JWT(accessToken).claims["azp"]?.asString().equals(clientId)
+            accessToken != null && JWT(accessToken).claims["azp"]?.asString().equals(clientId)
 
         fun isRefreshTokenValid(refreshToken: String?) =
             refreshToken != null &&
