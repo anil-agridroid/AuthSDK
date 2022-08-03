@@ -133,7 +133,7 @@ class Configuration(private val mContext: Context, private val _clientId:String,
         ClientInfo.getAuthClientInfo()?.let {
             if(it.getIsDebugMode()){
                 val clientDomain = ClientInfo.getAuthClientInfo()?.getClientKeycloakDomain()
-                clientDomain?.let { value = value.replace("https://oidc.agrevolution.in", it) }
+                clientDomain?.let { value = value.replace("https://oidc.dehat.co", it) }
             }
         }
         value = value.trim { it <= ' ' }
